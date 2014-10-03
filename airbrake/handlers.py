@@ -41,69 +41,73 @@ class AirbrakeHandler(logging.Handler):
     def _generate_xml(self, record):
         exn = None
         trace = None
-        if record.exc_info:
-            _, exn, trace = record.exc_info
 
-        message = record.getMessage()
-        if exn:
-            message = "{0}: {1}".format(message, str(exn))
+        try:
+            _, exn, trace = record.exc_info or sys.exc_info()
 
-        xml = Element('notice', dict(version='2.0'))
-        SubElement(xml, 'api-key').text = self.api_key
-
-        notifier = SubElement(xml, 'notifier')
-        SubElement(notifier, 'name').text = __app_name__
-        SubElement(notifier, 'version').text = __version__
-        SubElement(notifier, 'url').text = __app_url__
-
-        server_env = SubElement(xml, 'server-environment')
-        SubElement(server_env, 'environment-name').text = self.env_name
-
-        if hasattr(record, 'request'):
-            request = record.request
-            try:
-                match = resolve(request.path_info)
-            except Http404:
-                match = None
-
-            request_xml = SubElement(xml, 'request')
-            SubElement(request_xml, 'url').text = request.build_absolute_uri()
-
-            if match:
-                SubElement(request_xml, 'component').text = match.url_name
-                SubElement(request_xml, 'action').text = request.method
-
-            params = SubElement(request_xml, 'params')
-            for key, value in request.POST.items():
-                SubElement(params, 'var', dict(key=key)).text = str(value)
-
-            session = SubElement(request_xml, 'session')
-            for key, value in getattr(request, 'session', {}).items():
-                SubElement(session, 'var', dict(key=key)).text = str(value)
-
-            cgi_data = SubElement(request_xml, 'cgi-data')
-            for key, value in os.environ.items():
-                if key in self.env_variables:
-                    SubElement(cgi_data, 'var', dict(key=key)).text = str(value)
-            for key, value in request.META.items():
-                if key in self.meta_variables:
-                    SubElement(cgi_data, 'var', dict(key=key)).text = str(value)
-
-        error = SubElement(xml, 'error')
-        SubElement(error, 'class').text = exn.__class__.__name__ if exn else ''
-        SubElement(error, 'message').text = message
-
-        backtrace = SubElement(error, 'backtrace')
-        if trace is None:
-            SubElement(backtrace, 'line', dict(file=record.pathname,
-                                               number=str(record.lineno),
-                                               method=record.funcName))
-        else:
-            for pathname, lineno, funcName, text in traceback.extract_tb(trace):
-                SubElement(backtrace, 'line', dict(file=pathname,
-                                                   number=str(lineno),
-                                                   method='%s: %s' % (funcName,
-                                                                      text)))
+            message = record.getMessage()
+            if exn:
+                message = "{0}: {1}".format(message, str(exn))
+    
+            xml = Element('notice', dict(version='2.0'))
+            SubElement(xml, 'api-key').text = self.api_key
+    
+            notifier = SubElement(xml, 'notifier')
+            SubElement(notifier, 'name').text = __app_name__
+            SubElement(notifier, 'version').text = __version__
+            SubElement(notifier, 'url').text = __app_url__
+    
+            server_env = SubElement(xml, 'server-environment')
+            SubElement(server_env, 'environment-name').text = self.env_name
+    
+            if hasattr(record, 'request'):
+                request = record.request
+                try:
+                    match = resolve(request.path_info)
+                except Http404:
+                    match = None
+    
+                request_xml = SubElement(xml, 'request')
+                SubElement(request_xml, 'url').text = request.build_absolute_uri()
+    
+                if match:
+                    SubElement(request_xml, 'component').text = match.url_name
+                    SubElement(request_xml, 'action').text = request.method
+    
+                params = SubElement(request_xml, 'params')
+                for key, value in request.POST.items():
+                    SubElement(params, 'var', dict(key=key)).text = str(value)
+    
+                session = SubElement(request_xml, 'session')
+                for key, value in getattr(request, 'session', {}).items():
+                    SubElement(session, 'var', dict(key=key)).text = str(value)
+    
+                cgi_data = SubElement(request_xml, 'cgi-data')
+                for key, value in os.environ.items():
+                    if key in self.env_variables:
+                        SubElement(cgi_data, 'var', dict(key=key)).text = str(value)
+                for key, value in request.META.items():
+                    if key in self.meta_variables:
+                        SubElement(cgi_data, 'var', dict(key=key)).text = str(value)
+    
+            error = SubElement(xml, 'error')
+            SubElement(error, 'class').text = exn.__class__.__name__ if exn else ''
+            SubElement(error, 'message').text = message
+    
+            backtrace = SubElement(error, 'backtrace')
+            if trace is None:
+                SubElement(backtrace, 'line', dict(file=record.pathname,
+                                                   number=str(record.lineno),
+                                                   method=record.funcName))
+            else:
+                for pathname, lineno, funcName, text in traceback.extract_tb(trace):
+                    SubElement(backtrace, 'line', dict(file=pathname,
+                                                       number=str(lineno),
+                                                       method='%s: %s' % (funcName,
+                                                                          text)))
+        finally:
+            # Deleting trace to make sure we don't create circular reference
+            del trace
 
         return tostring(xml)
 
