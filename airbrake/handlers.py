@@ -6,6 +6,7 @@ try:
 except ImportError:
     from urllib2 import Request, urlopen, HTTPError
 import os
+import sys
 from xml.etree.ElementTree import Element, tostring, SubElement
 
 from django.core.urlresolvers import resolve
