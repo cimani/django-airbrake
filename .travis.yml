@@ -18,5 +18,6 @@ install:
   - pip install Django==$DJANGO_VERSION
   - pip install -e .
   - pip install coveralls mock
+  - pip install sh
 script: make coverage
 after_success: coveralls
